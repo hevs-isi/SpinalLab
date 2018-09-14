@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites name="results">
+  <testsuite name="all" package="all" tests="0">
+    <testcase classname="Tests" name="test1" ratio_time="5489209.847754221" sim_time_ns="8000501.0" time="1.457495927810669" />
+  </testsuite>
+</testsuites>

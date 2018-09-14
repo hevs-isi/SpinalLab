@@ -1,0 +1,36 @@
+[*]
+[*] GTKWave Analyzer v3.3.58 (w)1999-2014 BSI
+[*] Tue Nov 28 16:05:40 2017
+[*]
+[dumpfile] "/home/spinalvm/hdl/hevsLab/src/test/python/hevslab/sin_smooth/sim_build/vhdl.vcd"
+[dumpfile_mtime] "Tue Nov 28 16:05:26 2017"
+[dumpfile_size] 2499406
+[savefile] "/home/spinalvm/hdl/hevsLab/src/test/python/hevslab/sin_smooth/sim.gtkw"
+[timestart] 124000000
+[size] 1784 950
+[pos] -1 -1
+*-28.000000 763100000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 196
+[signals_width] 366
+[sst_expanded] 1
+[sst_vpaned_height] 271
+@8420
+interpolatorpolynom_x[27:0]
+@20000
+-
+-
+-
+@8420
+interpolatorpolynom_y[27:0]
+@8022
+io_sine[15:0]
+@20000
+-
+-
+-
+@28
+clk
+@29
+interpolatortrigger_newpolynome
+[pattern_trace] 1
+[pattern_trace] 0

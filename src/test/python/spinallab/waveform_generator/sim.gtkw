@@ -1,0 +1,47 @@
+[*]
+[*] GTKWave Analyzer v3.3.58 (w)1999-2014 BSI
+[*] Tue Nov 28 13:00:38 2017
+[*]
+[dumpfile] "/home/spinalvm/hdl/hevsLab/src/test/python/hevslab/waveform_generator/sim_build/vhdl.vcd"
+[dumpfile_mtime] "Tue Nov 28 12:57:21 2017"
+[dumpfile_size] 1739834
+[savefile] "/home/spinalvm/hdl/hevsLab/src/test/python/hevslab/waveform_generator/sim.gtkw"
+[timestart] 0
+[size] 1784 950
+[pos] -1 -1
+*-31.000000 3480000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 196
+[signals_width] 345
+[sst_expanded] 1
+[sst_vpaned_height] 271
+@28
+io_en
+@8022
+io_step[15:0]
+@10022
+phase[15:0]
+@20001
+-
+@8022
+io_sawtooth[11:0]
+@20000
+-
+@8022
+io_square[11:0]
+@20000
+-
+@8022
+io_triangle[11:0]
+@20000
+-
+@8022
+io_polygon[11:0]
+@20000
+-
+@8022
+io_sine[11:0]
+@20000
+-
+-
+[pattern_trace] 1
+[pattern_trace] 0
