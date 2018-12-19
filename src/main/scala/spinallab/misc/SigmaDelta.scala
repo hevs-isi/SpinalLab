@@ -1,7 +1,25 @@
 package spinallab.misc
 
+import javax.swing
+
 import spinal.core._
 import spinal.sim.Suspendable
+
+import javax.swing.JFrame
+import javax.swing.SwingUtilities
+import javax.swing.WindowConstants
+
+import org.jfree.chart.ChartFactory
+import org.jfree.chart.ChartPanel
+import org.jfree.chart.JFreeChart
+import org.jfree.chart.plot.PlotOrientation
+import org.jfree.data.xy.XYDataset
+import org.jfree.data.xy.XYSeries
+import org.jfree.data.xy.XYSeriesCollection
+import org.jfree.data.xy.XYSeriesCollection
+import org.jfree.chart.ChartFactory
+import org.jfree.chart.JFreeChart
+import org.jfree.chart.ChartFrame
 
 case class DeltaSigmaIo(parallelWidth : Int) extends Bundle{
   val parallelIn = in UInt(parallelWidth bits)
@@ -37,9 +55,17 @@ object SigmaDeltaTestbench extends App{
 
     //GUI thread
     fork {
-      val series = new XYSeries("f(x) = sin(x)")
-      val chart = XYLineChart(series)
-      chart.show()
+      val input = new XYSeries("input")
+      val output = new XYSeries("output (filtred)")
+      val dataset = new XYSeriesCollection
+      dataset.addSeries(input)
+      dataset.addSeries(output)
+      val chart = ChartFactory.createXYLineChart("input vs output", "time", "value", dataset,PlotOrientation.VERTICAL,true,true,false)
+      chart.getXYPlot.getRangeAxis.setAutoRange(false)
+      chart.getXYPlot.getRangeAxis.setRange(0, 1)
+      val frame = new ChartFrame("Results", chart)
+      frame.pack()
+      frame.setVisible(true)
 
       var hit = 0.5
       val coef = 0.002
@@ -54,10 +80,8 @@ object SigmaDeltaTestbench extends App{
           overSamplingCounter = 0
           val time = simTime()
           val value = hit
-          swing.Swing onEDT {
-            series.add(time, value)
-          }
-          Thread.sleep(1)
+          input.add(time, dut.io.parallelIn.toInt / 1024.0/64.0)
+          output.add(time, value)
         }
       }
     }

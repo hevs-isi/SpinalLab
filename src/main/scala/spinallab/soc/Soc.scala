@@ -11,7 +11,7 @@ import spinal.lib.misc.{InterruptCtrl, Prescaler, Timer}
 import spinal.lib.soc.pinsec.{PinsecTimerCtrl, PinsecTimerCtrlExternal}
 import vexriscv.demo._
 import vexriscv.plugin._
-import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
+import vexriscv._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -55,7 +55,9 @@ object SocConfig{
     cpuPlugins = ArrayBuffer( //DebugPlugin added by the toplevel
       new IBusSimplePlugin(
         resetVector = 0x80000000l,
-        catchAccessFault = false
+        catchAccessFault = false,
+        cmdForkOnSecondStage = false,
+        cmdForkPersistence = false
       ),
       new DBusSimplePlugin(
         catchAddressMisaligned = false,
