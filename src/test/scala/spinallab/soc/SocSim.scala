@@ -19,10 +19,10 @@ import vexriscv.test._
 //Openocd => src/openocd -f tcl/interface/jtag_tcp.cfg -c 'set MURAX_CPU0_YAML ../VexRiscvLab/cpu0.yaml' -f tcl/target/murax.cfg
 object SocSim {
   def main(args: Array[String]): Unit = {
-  //def config = MuraxConfig.default.copy(onChipRamSize = 256 kB)
-  //def config = MuraxConfig.default.copy(coreFrequency = 66 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "src/main/ressource/hex/demo.hex")
+  //def config = SocConfig.default.copy(onChipRamSize = 256 kB)
+  //def config = SocConfig.default.copy(coreFrequency = 66/4 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "src/main/ressource/hex/demo.hex")
   def config = SocConfig.default.copy(coreFrequency = 66/4 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "/home/clean-mint/spinal/VexRiscvSocSoftware/projects/murax/demo/build/demo.hex")
-  //def config = MuraxConfig.default.copy(coreFrequency = 66 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "/home/clean-mint/spinal/VexRiscvSocSoftware/projects/murax/draw/build/draw.hex")
+//  def config = SocConfig.default.copy(coreFrequency = 66/4 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "/home/clean-mint/spinal/VexRiscvSocSoftware/projects/murax/draw/build/draw.hex")
 
     SimConfig.compile(new Soc(config)).doSimUntilVoid{ dut =>
       val mainClkPeriod = (1e12/dut.config.coreFrequency.toDouble).toLong

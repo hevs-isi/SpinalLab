@@ -3,12 +3,11 @@ package spinallab.soc
 import spinal.core._
 import spinal.lib._
 import spinal.lib.bus.amba3.apb._
-import spinal.lib.bus.misc.SizeMapping
+import spinal.lib.bus.misc._
+import spinal.lib.bus.simple._
 import spinal.lib.com.jtag.Jtag
 import spinal.lib.com.uart._
 import spinal.lib.io.{InOutWrapper, TriStateArray}
-import spinal.lib.misc.{InterruptCtrl, Prescaler, Timer}
-import spinal.lib.soc.pinsec.{PinsecTimerCtrl, PinsecTimerCtrlExternal}
 import vexriscv.demo._
 import vexriscv.plugin._
 import vexriscv._
@@ -34,13 +33,9 @@ import scala.collection.mutable.ArrayBuffer
 case class SocConfig(coreFrequency : HertzNumber,
                      onChipRamSize      : BigInt,
                      onChipRamHexFile   : String,
-                     pipelineDBus       : Boolean,
-                     pipelineMainBus    : Boolean,
-                     pipelineApbBridge  : Boolean,
                      gpioWidth          : Int,
                      uartCtrlConfig     : UartCtrlMemoryMappedConfig,
                      cpuPlugins         : ArrayBuffer[Plugin[VexRiscv]]){
-  require(pipelineApbBridge || pipelineMainBus, "At least pipelineMainBus or pipelineApbBridge should be enable to avoid wipe transactions")
 }
 
 object SocConfig{
@@ -48,16 +43,13 @@ object SocConfig{
     coreFrequency         = 66/4 MHz,
     onChipRamSize         = 8 kB,
     onChipRamHexFile      = null,
-    pipelineDBus          = true,
-    pipelineMainBus       = false,
-    pipelineApbBridge     = true,
     gpioWidth = 32,
     cpuPlugins = ArrayBuffer( //DebugPlugin added by the toplevel
       new IBusSimplePlugin(
         resetVector = 0x80000000l,
         catchAccessFault = false,
         cmdForkOnSecondStage = false,
-        cmdForkPersistence = false
+        cmdForkPersistence = true
       ),
       new DBusSimplePlugin(
         catchAddressMisaligned = false,
@@ -190,15 +182,19 @@ case class Soc(config : SocConfig) extends Component{
   )
 
   val system = new ClockingArea(systemClockDomain) {
-    val simpleBusConfig = SimpleBusConfig(
-      addressWidth = 32,
-      dataWidth = 32
-    )
+    //***************************************
+    //****** Interconnects utilities ********
+    //***************************************
+    val interconnect = PipelinedMemoryBusInterconnect()
+    val apbMapping = ArrayBuffer[(Apb3, SizeMapping)]()
 
-    //Arbiter of the cpu dBus/iBus to drive the mainBus
-    //Priority to dBus, !! cmd transactions can change on the fly !!
-    val mainBusArbiter = new MuraxMasterArbiter(simpleBusConfig)
+    val mainBus = PipelinedMemoryBus(addressWidth = 32, dataWidth = 32)
+    interconnect.addSlave(mainBus, DefaultMapping)
 
+
+    //*********************************************
+    //****** CPU instanciation and binding ********
+    //*********************************************
     //Instanciate the CPU
     val cpu = new VexRiscv(
       config = VexRiscvConfig(
@@ -206,18 +202,17 @@ case class Soc(config : SocConfig) extends Component{
       )
     )
 
-    //Checkout plugins used to instanciate the CPU to connect them to the SoC
+    //Checkout plugins used to instantiate the CPU to connect them to the SoC
     val timerInterrupt = False
     val externalInterrupt = False
+    val dBus = PipelinedMemoryBus(mainBus.config)
+    val iBus = PipelinedMemoryBus(mainBus.config)
     for(plugin <- cpu.plugins) plugin match{
-      case plugin : IBusSimplePlugin => mainBusArbiter.io.iBus <> plugin.iBus
+      case plugin : IBusSimplePlugin => iBus << plugin.iBus.toPipelinedMemoryBus()
       case plugin : DBusSimplePlugin => {
-        if(!pipelineDBus)
-          mainBusArbiter.io.dBus <> plugin.dBus
-        else {
-          mainBusArbiter.io.dBus.cmd << plugin.dBus.cmd.halfPipe()
-          mainBusArbiter.io.dBus.rsp <> plugin.dBus.rsp
-        }
+        val buffer = plugin.dBus.toPipelinedMemoryBus()
+        dBus.cmd << buffer.cmd.halfPipe()
+        dBus.rsp >> buffer.rsp
       }
       case plugin : CsrPlugin        => {
         plugin.externalInterrupt := externalInterrupt
@@ -231,34 +226,45 @@ case class Soc(config : SocConfig) extends Component{
     }
 
 
-
+    //******************************
     //****** MainBus slaves ********
-    val ram = new MuraxSimpleBusRam(
+    //******************************
+    val ram = new Spartan3PipelinedMemoryBusRam(
       onChipRamSize = onChipRamSize,
       onChipRamHexFile = onChipRamHexFile,
-      simpleBusConfig = simpleBusConfig
+      pipelinedMemoryBusConfig = mainBus.config
     )
+    interconnect.addSlave(ram.io.bus, SizeMapping(0x80000000l, onChipRamSize))
 
-    val apbBridge = new MuraxSimpleBusToApbBridge(
+    val apbBridge = new PipelinedMemoryBusToApbBridge(
       apb3Config = Apb3Config(
         addressWidth = 20,
         dataWidth = 32
       ),
-      pipelineBridge = pipelineApbBridge,
-      simpleBusConfig = simpleBusConfig
+      pipelineBridge = true,
+      pipelinedMemoryBusConfig = mainBus.config
     )
+    interconnect.addSlave(apbBridge.io.pipelinedMemoryBus, SizeMapping(0xF0000000l, 1 MB))
 
 
+    //**********************************
+    //******** APB slaves *********
+    //**********************************
 
-    //******** APB peripherals *********
+    //Add the GPIO controller
     val gpioACtrl = new ApbGpio(gpioWidth = gpioWidth) //TODO fill Apb3Gpio implementation
     io.gpioA <> gpioACtrl.io.gpio
+    apbMapping += gpioACtrl.io.apb -> (0x00000, 4 kB)
 
+    //Add the UART controller TODO
     io.uart.txd := True //TODO
 
+    //Add the Timer
     val timer = new MuraxApb3Timer()
     timerInterrupt setWhen(timer.io.interrupt)
+    apbMapping += timer.io.apb     -> (0x20000, 4 kB)
 
+    //Add the DrawCtrl TODO
     val drawCtrl = new DrawCtrl(
       channelCount = 2,
       signalBitNb = 16,
@@ -267,25 +273,19 @@ case class Soc(config : SocConfig) extends Component{
     )
     drawCtrl.io.channels(0) <> io.drawX
     drawCtrl.io.channels(1) <> io.drawY
+    apbMapping += drawCtrl.io.apb  -> (0x30000, 4 kB)
 
-    //******** Memory mappings *********
+    //******** Memory interconnect finalisation *********
     val apbDecoder = Apb3Decoder(
       master = apbBridge.io.apb,
-      slaves = List[(Apb3, SizeMapping)](
-        gpioACtrl.io.apb -> (0x00000, 4 kB),
-        timer.io.apb     -> (0x20000, 4 kB),
-        drawCtrl.io.apb  -> (0x30000, 4 kB)
-      )
+      slaves = apbMapping
     )
 
-
-    val mainBusDecoder = new MuraxSimpleBusDecoder(
-      master = mainBusArbiter.io.masterBus,
-      specification = List[(SimpleBus,SizeMapping)](
-        ram.io.bus             -> (0x80000000l, onChipRamSize),
-        apbBridge.io.simpleBus -> (0xF0000000l, 1 MB)
-      ),
-      pipelineMaster = pipelineMainBus
+    //Define which bus can access to which slave
+    interconnect.addMasters(
+      dBus   -> List(mainBus),
+      iBus   -> List(mainBus),
+      mainBus-> List(ram.io.bus, apbBridge.io.pipelinedMemoryBus)
     )
   }
 }
@@ -296,27 +296,27 @@ case class Soc(config : SocConfig) extends Component{
 object SocEbs{
   def main(args: Array[String]) {
     SpinalVhdl(InOutWrapper{
-      val m = Soc(SocConfig.default.copy(onChipRamSize = 4 kB/*, onChipRamHexFile = "src/main/ressource/hex/muraxDemo.hex"*/))
+      val m = Soc(SocConfig.default.copy(onChipRamSize = 8 kB/*, onChipRamHexFile = "src/main/ressource/hex/muraxDemo.hex"*/))
       m.rework{
         ///Fix ram inferation
         //m.system.ram.ram.addAttribute("ram_style", "block")
         //m.system.ram.ram.addAttribute("rom_style", "block")
 
         //Reduce GPIO width
-        m.io.gpioA.asDirectionLess().unsetName().allowDirectionLessIo
+        m.io.gpioA.setAsDirectionLess().unsetName().allowDirectionLessIo
         val gpioA = master(TriStateArray(4 bits)).setName("io_gpioA")
         gpioA.writeEnable := m.io.gpioA.writeEnable.resized
         gpioA.write := m.io.gpioA.write.resized
-        m.io.gpioA.read := m.io.gpioA.read
+        m.io.gpioA.read := gpioA.read.resized
 
         //adapt asyncReset polarity
-        m.io.asyncReset.asDirectionLess().allowDirectionLessIo := !(in(Bool).setName("io_asyncResetN"))
+        m.io.asyncReset.setAsDirectionLess().allowDirectionLessIo := !(in(Bool).setName("io_asyncResetN"))
 
         //clock divider
         ClockDomain(in(Bool).setName("io_mainClk")) {
           val counter = Reg(UInt(2 bits)) randBoot()
           counter := counter + 1
-          m.io.mainClk.unsetName().asDirectionLess().allowDirectionLessIo := counter.msb
+          m.io.mainClk.unsetName().setAsDirectionLess().allowDirectionLessIo := counter.msb
         }
 
       }
