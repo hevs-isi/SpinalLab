@@ -253,16 +253,16 @@ case class Soc(config : SocConfig) extends Component{
 
     //Add the GPIO controller
     val gpioACtrl = new ApbGpio(gpioWidth = gpioWidth) //TODO fill Apb3Gpio implementation
-    io.gpioA <> gpioACtrl.io.gpio
     apbMapping += gpioACtrl.io.apb -> (0x00000, 4 kB)
+    io.gpioA <> gpioACtrl.io.gpio
 
     //Add the UART controller TODO
     io.uart.txd := True //TODO
 
     //Add the Timer
     val timer = new MuraxApb3Timer()
-    timerInterrupt setWhen(timer.io.interrupt)
     apbMapping += timer.io.apb     -> (0x20000, 4 kB)
+    timerInterrupt setWhen(timer.io.interrupt)
 
     //Add the DrawCtrl TODO
     val drawCtrl = new DrawCtrl(
@@ -271,9 +271,9 @@ case class Soc(config : SocConfig) extends Component{
       memSize = 16,
       timerWidth  = 16
     )
+    apbMapping += drawCtrl.io.apb  -> (0x30000, 4 kB)
     drawCtrl.io.channels(0) <> io.drawX
     drawCtrl.io.channels(1) <> io.drawY
-    apbMapping += drawCtrl.io.apb  -> (0x30000, 4 kB)
 
     //******** Memory interconnect finalisation *********
     val apbDecoder = Apb3Decoder(
@@ -296,7 +296,7 @@ case class Soc(config : SocConfig) extends Component{
 object SocEbs{
   def main(args: Array[String]) {
     SpinalVhdl(InOutWrapper{
-      val m = Soc(SocConfig.default.copy(onChipRamSize = 8 kB/*, onChipRamHexFile = "src/main/ressource/hex/muraxDemo.hex"*/))
+      val m = Soc(SocConfig.default.copy(onChipRamSize = 4 kB/*, onChipRamHexFile = "src/main/ressource/hex/muraxDemo.hex"*/))
       m.rework{
         ///Fix ram inferation
         //m.system.ram.ram.addAttribute("ram_style", "block")
@@ -318,7 +318,6 @@ object SocEbs{
           counter := counter + 1
           m.io.mainClk.unsetName().setAsDirectionLess().allowDirectionLessIo := counter.msb
         }
-
       }
       m
     })
