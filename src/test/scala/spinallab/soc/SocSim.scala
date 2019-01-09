@@ -20,14 +20,13 @@ import vexriscv.test._
 object SocSim {
   def main(args: Array[String]): Unit = {
   //def config = SocConfig.default.copy(onChipRamSize = 256 kB)
-  //def config = SocConfig.default.copy(coreFrequency = 66/4 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "src/main/ressource/hex/demo.hex")
-  def config = SocConfig.default.copy(coreFrequency = 66/4 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "/home/clean-mint/spinal/VexRiscvSocSoftware/projects/murax/demo/build/demo.hex")
-//  def config = SocConfig.default.copy(coreFrequency = 66/4 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "/home/clean-mint/spinal/VexRiscvSocSoftware/projects/murax/draw/build/draw.hex")
+  def config = SocConfig.default.copy(coreFrequency = 66/4 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "src/main/c/demo/build/demo.hex")
+//  def config = SocConfig.default.copy(coreFrequency = 66/4 MHz, onChipRamSize = 4 kB, onChipRamHexFile = "src/main/c/draw/build/draw.hex")
 
     SimConfig.compile(new Soc(config)).doSimUntilVoid{ dut =>
       val mainClkPeriod = (1e12/dut.config.coreFrequency.toDouble).toLong
       val jtagClkPeriod = mainClkPeriod*4
-      val uartBaudRate = 115200
+      val uartBaudRate = 9600
       val uartBaudPeriod = (1e12/uartBaudRate).toLong
 
       val clockDomain = ClockDomain(dut.io.mainClk, dut.io.asyncReset)

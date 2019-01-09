@@ -25,8 +25,16 @@ out
 bin/
 .classpath
 .project
+.cproject
 .settings
 .cache-main
+*.d
+*.o
+*.asm
+*.elf
+*.hex
+*.map
+*.v
 
 #User
 /*.vhd

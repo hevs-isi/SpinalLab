@@ -1,6 +1,18 @@
-In the case where https://github.com/SpinalHDL/SpinalTemplateSbt isn't enough because you want to include some third party SBT project (local or from remote on a git repository), you can use this SpinalTemplateSbtDependencies as a template.
 
-For instance this SpinalTemplateSbtDependencies repo depend on https://github.com/SpinalHDL/VexRiscv/tree/master/src/main/scala/vexriscv.
 
-The only difference with the https://github.com/SpinalHDL/SpinalTemplateSbt are in the https://github.com/SpinalHDL/SpinalTemplateSbtDependencies/blob/superproject/build.sbt file. Just look at it, it is straight forward.
+## SoC
 
+```sh
+cd ~/spinal/openocd_riscv
+src/openocd -f tcl/interface/jtag_tcp.cfg -c 'set MURAX_CPU0_YAML ../SpinalLab/cpu0.yaml' -f tcl/target/murax.cfg
+
+cd ~/spinal/openocd_riscv
+sudo src/openocd -f tcl/interface/ftdi/ft2232h_breakout.cfg -c 'set MURAX_CPU0_YAML ../SpinalLab/cpu0.yaml' -f tcl/target/murax.cfg
+
+
+ls -la /dev/ttyUSB1
+sudo chmod 666 /dev/ttyUSB1
+stty -F /dev/ttyUSB1 9600 cs8 -cstopb -parenb
+cu -l /dev/ttyUSB1
+
+```
