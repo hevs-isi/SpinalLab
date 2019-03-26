@@ -2,6 +2,8 @@ package spinallab.misc
 
 import spinal.core._
 
+import scala.util.Random
+
 class SinSmooth(phaseBitNb : Int,
                 signalBitNb : Int,
                 tableAddressBitNb : Int,
@@ -46,78 +48,97 @@ class SinSmooth(phaseBitNb : Int,
       sample := sample.maxValue
     }
 
-    val sine = phase(phaseBitNb-1).mux(
-      False ->  sample,
-      True  -> -sample
-    )
+    val sine = phase(phaseBitNb-1) ? -sample | sample
   }
 
-  val interpolatorTrigger = new Area{
-    val sampleCountBitNb = phaseBitNb-2-tableAddressBitNb
-    val en = True
-    val counter = Reg(UInt(sampleCountBitNb bits)) init(0)
-    val newPolynome = False
-    when(en) {
-      counter := counter + 1
-      when(counter === counter.maxValue){
-        newPolynome := True
+  val interpolator = new Area {
+    val trigger = new Area {
+      val sampleCountBitNb = phaseBitNb - 2 - tableAddressBitNb
+      val en = True
+      val counter = Reg(UInt(sampleCountBitNb bits)) init (0)
+      val newPolynome = False
+      when(en) {
+        counter := counter + 1
+        when(counter === counter.maxValue) {
+          newPolynome := True
+        }
+      }
+    }
+
+    val shiftRegister = new Area {
+      val samples = Vec(Reg(SInt(signalBitNb bits)) init (0), 4)
+      when(trigger.newPolynome) {
+        for (i <- 0 to 2) {
+          samples(i) := samples(i + 1)
+        }
+        samples(3) := sineTable.sine
+      }
+    }
+
+    val coeffBitNb = signalBitNb + 4
+    val coefficients = new Area {
+
+      import shiftRegister.samples
+
+      val a = -samples(0).resize(coeffBitNb) + 3 * samples(1) - 3 * samples(2) + samples(3)
+      val b = 2 * samples(0).resize(coeffBitNb) - 5 * samples(1) + 4 * samples(2) - samples(3)
+      val c = -samples(0).resize(coeffBitNb) + samples(2)
+      val d = samples(1).resize(coeffBitNb)
+    }
+
+    val polynom = new Area {
+      val en = True
+      val m = oversamplingBitNb
+
+      import coefficients.{a, b, c, d}
+
+      val x, u, v, w, y = Reg(SInt(coeffBitNb + 3 * m + 8 bits))
+      when(en) {
+        when(trigger.newPolynome) {
+          x := (d << (3 * m + 1)).resized
+          u := (a + (b << m) + (c << (2 * m))).resized
+          v := (6 * a + (b << (m + 1))).resized
+          w := (6 * a).resized
+          y := (d).resized
+        } otherwise {
+          val xNext = x + u
+          y := (xNext >> (3 * m + 1)).resized
+          x := xNext
+          u := u + v
+          v := v + w
+        }
       }
     }
   }
 
-  val interpolatorShiftRegister = new Area{
-    val samples = Vec(Reg(SInt(signalBitNb bits)) init(0), 4)
-    when(interpolatorTrigger.newPolynome){
-      for(i <- 0 to 2){
-        samples(i) := samples(i + 1)
-      }
-      samples(3) := sineTable.sine
-    }
-  }
-
-  val coeffBitNb = signalBitNb+4
-  val interpolatorCoefficients = new Area{
-    import interpolatorShiftRegister.samples
-    val a = - samples(0).resize(coeffBitNb) + 3*samples(1) - 3*samples(2) + samples(3)
-    val b = 2*samples(0).resize(coeffBitNb) - 5*samples(1) + 4*samples(2) - samples(3)
-    val c = - samples(0).resize(coeffBitNb)                +   samples(2)
-    val d =                                     samples(1).resize(coeffBitNb)
-  }
-
-  val interpolatorPolynom = new Area{
-    val en = True
-    val m = oversamplingBitNb
-    import interpolatorCoefficients.{a, b, c, d}
-    val x, u, v, w, y = Reg(SInt(coeffBitNb + 3*m + 8 bits))
-    when(en) {
-      when(interpolatorTrigger.newPolynome) {
-        x := (d << (3 * m + 1)).resized
-        u := (a + (b << m) + (c << (2 * m))).resized
-        v := (6 * a + (b << (m + 1))).resized
-        w := (6 * a).resized
-        y := (d).resized
-      } otherwise {
-        val xNext = x + u
-        y := (xNext >> (3 * m + 1)).resized
-        x := xNext
-        u := u + v
-        v := v + w
-      }
-    }
-  }
-
-  io.sine := interpolatorPolynom.y.asUInt.resized + (1 << (signalBitNb - 1))
+  io.sine := interpolator.polynom.y.asUInt.resized + (1 << (signalBitNb - 1))
 }
 
 
-object SinSmooth {
-  def main(args: Array[String]) {
-    SpinalVhdl(new SinSmooth(
-      phaseBitNb = 8,
-      signalBitNb = 16,
-      tableAddressBitNb = 3,
-      oversamplingBitNb = 3
-    ))
-  }
+object SinSmoothVhdl extends App{
+  SpinalVhdl(new SinSmooth(
+    phaseBitNb = 8,
+    signalBitNb = 16,
+    tableAddressBitNb = 3,
+    oversamplingBitNb = 3
+  ))
 }
 
+
+
+object SinSmoothSim extends App{
+  import spinal.core.sim._
+
+  val simulator = SimConfig.withWave.compile(new SinSmooth(
+    phaseBitNb = 8,
+    signalBitNb = 16,
+    tableAddressBitNb = 3,
+    oversamplingBitNb = 3
+  ))
+
+  simulator.doSim{dut =>
+    dut.clockDomain.forkStimulus(period = 10)
+    dut.io.step #= 1
+    dut.clockDomain.waitSampling(10000)
+  }
+}

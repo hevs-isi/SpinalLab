@@ -1,5 +1,8 @@
 package spinallab.misc
 
+import org.jfree.chart.{ChartFactory, ChartFrame}
+import org.jfree.chart.plot.PlotOrientation
+import org.jfree.data.xy.{XYSeries, XYSeriesCollection}
 import spinal.core._
 
 class SineTop extends Component {
@@ -53,17 +56,50 @@ object SineTop {
 
   def main(args: Array[String]): Unit = {
     SimConfig.doSim(new SineTop) { dut =>
-      var idx = 0
+
+      //GUI thread
+      fork {
+        val xSeries = new XYSeries("input")
+        val ySeries = new XYSeries("output (filtred)")
+        val dataset = new XYSeriesCollection
+        dataset.addSeries(xSeries)
+        dataset.addSeries(ySeries)
+        val chart = ChartFactory.createXYLineChart("input vs output", "time", "value", dataset,PlotOrientation.VERTICAL,true,true,false)
+        chart.getXYPlot.getRangeAxis.setAutoRange(false)
+        chart.getXYPlot.getRangeAxis.setRange(0, 1)
+        val frame = new ChartFrame("Results", chart)
+        frame.pack()
+        frame.setVisible(true)
+
+        var xFilterState, yFilterState = 0.5
+        val coef = 0.002
+        val overSampling = 10
+        var overSamplingCounter = 0
+        while (true) {
+          dut.logicClockDomain.waitSampling()
+          val xTarget = if (dut.xOut.toBoolean) 1.0 else 0.0
+          val yTarget = if (dut.yOut.toBoolean) 1.0 else 0.0
+          xFilterState = xFilterState * (1.0 - coef) + xTarget * coef
+          yFilterState = yFilterState * (1.0 - coef) + yTarget * coef
+          overSamplingCounter += 1
+          if (overSamplingCounter == overSampling) {
+            overSamplingCounter = 0
+            val time = simTime()
+            xSeries.add(time, xFilterState)
+            ySeries.add(time, yFilterState)
+          }
+        }
+      }
+
       dut.reset_N #= false
       sleep(10)
       dut.reset_N #= true
       sleep(10)
-      while (idx < 100000) {
+      for(idx <- 0 to 200000) {
         dut.clock #= false
         sleep(10)
         dut.clock #= true
         sleep(10)
-        idx += 1
       }
     }
   }

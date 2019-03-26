@@ -2,6 +2,8 @@ package spinallab.misc
 
 import spinal.core._
 
+import scala.util.Random
+
 class WaveformGenerator(phaseBitNb : Int,
                         signalBitNb : Int,
                         shiftBitNb : Int) extends Component {
@@ -22,20 +24,17 @@ class WaveformGenerator(phaseBitNb : Int,
   }
 
   io.sawtooth := phase >> (phaseBitNb - signalBitNb)
-  io.square := U(io.square.range -> io.sawtooth.msb)
+  io.square := (default -> io.sawtooth.msb)
 
-  io.triangle := io.sawtooth.msb.mux(
-    False ->  io.sawtooth,
-    True  -> ~io.sawtooth
-  ) |<< 1
+  io.triangle := (io.sawtooth ^ U(io.sawtooth.range -> io.sawtooth.msb)) |<< 1
 
   val polygon = new Area{
     val mul = io.triangle.resize(widthOf(io.triangle) + 1) + (io.triangle >> 1)
     val anEighth = 1 << (signalBitNb-2)
     val sat = Select(
-      (mul < anEighth) -> U(anEighth),
+      (mul < anEighth)     -> U(anEighth),
       (mul > 5*anEighth-1) -> U(5*anEighth-1),
-      default -> mul
+      default              -> mul
     )
     io.polygon := (sat - anEighth).resized
   }
@@ -45,14 +44,30 @@ class WaveformGenerator(phaseBitNb : Int,
   io.sine := lowpassAcc >> shiftBitNb
 }
 
-object WaveformGenerator {
-  def main(args: Array[String]) {
-    SpinalVhdl(new WaveformGenerator(
-      phaseBitNb = 16,
-      signalBitNb = 12,
-      shiftBitNb = 8
-    ))
-
-  }
+object WaveformGeneratorVhdl extends App {
+  SpinalVhdl(new WaveformGenerator(
+    phaseBitNb = 16,
+    signalBitNb = 12,
+    shiftBitNb = 8
+  ))
 }
 
+
+object WaveformGeneratorSim extends App{
+  import spinal.core.sim._
+
+  val simulator = SimConfig.withWave.compile(new WaveformGenerator(
+    phaseBitNb = 16,
+    signalBitNb = 12,
+    shiftBitNb = 8
+  ))
+
+  simulator.doSim{dut =>
+    dut.clockDomain.forkStimulus(period = 10)
+    for(i <- 0 until 50) {
+      dut.io.en.randomize()
+      dut.io.step #= Random.nextInt(100) + 40
+      dut.clockDomain.waitSampling(Random.nextInt(5000))
+    }
+  }
+}

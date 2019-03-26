@@ -10,6 +10,7 @@ void main() {
 	int counter = 'a';
 	while(1){
 		//uint32_t value = ~(GPIO_A[0] >> 8);
+		//GPIO_A[0] = value;
 		uint32_t value = GPIO_A[0] + 1;
 		GPIO_A[0] = value;
 		int32_t readed = ((int*) 0xF0010000)[0];
