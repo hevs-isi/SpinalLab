@@ -33,15 +33,6 @@ object SocSim {
       clockDomain.forkStimulus(mainClkPeriod)
       //      clockDomain.forkSimSpeedPrinter(2)
 
-      //      val openocd = new Thread  {
-      //        override def run() = {
-      //          Thread.sleep(400)
-      //          scala.sys.process.Process(Seq("src/openocd","-f", "tcl/interface/jtag_tcp.cfg","-c","set MURAX_CPU0_YAML ../VexRiscvLab/cpu0.yaml", "-f","tcl/target/murax.cfg"), new File("../openocd_riscv")).!
-      //        }
-      //      }
-      //      openocd.start()
-
-
       val tcpJtag = JtagTcp(
         jtag = dut.io.jtag,
         jtagClkPeriod = jtagClkPeriod
